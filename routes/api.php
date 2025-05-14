@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ServiceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -22,14 +23,16 @@ Route::post('/login', [AuthController::class, 'login']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
-    
+
     // Admin routes
-    Route::middleware('ability:Admin')->group(function () {
-        // Admin-specific routes will go here
+    Route::middleware('role:Admin')->group(function () {
+        // Service routes
+        Route::apiResource('services', ServiceController::class);
+        Route::post('services/search', [ServiceController::class, 'search']);
     });
-    
+
     // Employer routes
-    Route::middleware('ability:Employer')->group(function () {
+    Route::middleware('role:Employer')->group(function () {
         // Employer-specific routes will go here
     });
 });
