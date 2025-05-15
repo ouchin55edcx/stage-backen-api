@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -31,6 +31,17 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
+        }
+
+        // Check if the user is an employer and if they are active
+        if ($user->isEmployer()) {
+            $employer = $user->employer;
+
+            if (!$employer || !$employer->is_active) {
+                return response()->json([
+                    'message' => 'Your account has been deactivated. Please contact the administrator.'
+                ], Response::HTTP_FORBIDDEN);
+            }
         }
 
         // Create a token for the user

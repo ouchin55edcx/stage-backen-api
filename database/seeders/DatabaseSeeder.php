@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -13,12 +12,10 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Call the AdminSeeder to create the default admin user
+        // Call the seeders to create default users
         $this->call([
             AdminSeeder::class,
+            EmployerSeeder::class,
         ]);
-
-        // Create some employer users
-        User::factory(5)->employer()->create();
     }
 }

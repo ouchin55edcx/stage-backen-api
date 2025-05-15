@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EmployerController;
 use App\Http\Controllers\ServiceController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +30,11 @@ Route::middleware('auth:sanctum')->group(function () {
         // Service routes
         Route::apiResource('services', ServiceController::class);
         Route::post('services/search', [ServiceController::class, 'search']);
+
+        // Employer management routes
+        Route::apiResource('employers', EmployerController::class)->except(['destroy']);
+        Route::post('employers/search', [EmployerController::class, 'search']);
+        Route::patch('employers/{id}/toggle-active', [EmployerController::class, 'toggleActive']);
     });
 
     // Employer routes

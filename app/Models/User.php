@@ -58,6 +58,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the employer associated with the user.
+     */
+    public function employer(): HasOne
+    {
+        return $this->hasOne(Employer::class);
+    }
+
+    /**
      * Check if the user is an admin.
      */
     public function isAdmin(): bool
