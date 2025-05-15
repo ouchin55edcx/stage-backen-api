@@ -99,11 +99,24 @@ class EmployerController extends Controller
             ]);
 
             // Send email with credentials
-            Mail::to($user->email)->send(new EmployerCredentials(
-                $user->full_name,
-                $user->email,
-                $password
-            ));
+            try {
+                Mail::to($user->email)->send(new EmployerCredentials(
+                    $user->full_name,
+                    $user->email,
+                    $password
+                ));
+
+                \Log::info('Email sent to employer: ' . $user->email);
+            } catch (\Exception $e) {
+                \Log::error('Failed to send email to employer: ' . $e->getMessage());
+                // Continue with the process even if email fails
+            }
+
+            // Also log credentials for debugging
+            \Log::info('New employer created with credentials:');
+            \Log::info('Full Name: ' . $user->full_name);
+            \Log::info('Email: ' . $user->email);
+            \Log::info('Password: ' . $password);
 
             DB::commit();
 
@@ -313,5 +326,59 @@ class EmployerController extends Controller
         return response()->json([
             'employers' => $employers
         ]);
+    }
+
+    /**
+     * Test sending email to an employer.
+     *
+     * @param string $id
+     * @return JsonResponse
+     */
+    public function testEmail(string $id): JsonResponse
+    {
+        $employer = Employer::with('user')->find($id);
+
+        if (!$employer) {
+            return response()->json([
+                'message' => 'Employer not found'
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        try {
+            // Generate a test password
+            $testPassword = Str::random(10);
+
+            // Send test email with credentials
+            try {
+                Mail::to($employer->user->email)->send(new EmployerCredentials(
+                    $employer->user->full_name,
+                    $employer->user->email,
+                    $testPassword
+                ));
+
+                \Log::info('Test email sent to employer: ' . $employer->user->email);
+            } catch (\Exception $e) {
+                \Log::error('Failed to send test email to employer: ' . $e->getMessage());
+                return response()->json([
+                    'message' => 'Failed to send test email',
+                    'error' => $e->getMessage()
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+
+            // Also log credentials for debugging
+            \Log::info('Test credentials for employer:');
+            \Log::info('Full Name: ' . $employer->user->full_name);
+            \Log::info('Email: ' . $employer->user->email);
+            \Log::info('Password: ' . $testPassword);
+
+            return response()->json([
+                'message' => 'Test email sent successfully to ' . $employer->user->email
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to send test email',
+                'error' => $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }

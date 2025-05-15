@@ -9,6 +9,11 @@ class Equipment extends Model
 {
     use HasFactory;
 
+    public function interventions()
+    {
+        return $this->hasMany(Intervention::class);
+    }
+
     protected $table = 'equipments';
 
     protected $fillable = [
