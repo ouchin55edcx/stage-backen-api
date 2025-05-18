@@ -1,11 +1,14 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DeclarationController;
 use App\Http\Controllers\EmployerController;
 use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\EquipmentController;
 use App\Http\Controllers\InterventionController;
 use App\Http\Controllers\LicenseController;
+use App\Http\Controllers\MaintenanceController;
+use App\Http\Controllers\StatisticsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -136,6 +139,9 @@ Route::post('/test-create-employer', function(Illuminate\Http\Request $request) 
     }
 });
 
+// Test route for debugging
+Route::get('/test-my-declarations', [DeclarationController::class, 'getByEmployer']);
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -157,10 +163,25 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('equipments', EquipmentController::class);
         Route::apiResource('interventions', InterventionController::class);
         Route::apiResource('licenses', LicenseController::class);
+        Route::apiResource('maintenances', MaintenanceController::class);
+
+        // Admin declaration routes
+        Route::get('all-declarations', [DeclarationController::class, 'getAllDeclarations'])->name('admin.all-declarations');
+        Route::get('declarations/{id}', [DeclarationController::class, 'show']);
+        Route::get('employers/{employerId}/declarations', [DeclarationController::class, 'getByEmployer']);
+        Route::post('declarations/{id}/process', [DeclarationController::class, 'processDeclaration'])->name('admin.process-declaration');
+
+        // Admin statistics routes
+        Route::get('statistics', [StatisticsController::class, 'getAdminStatistics'])->name('admin.statistics');
     });
 
     // Employer routes
     Route::middleware('role:Employer')->group(function () {
-        // Employer-specific routes will go here
+        // Declaration routes for employers
+        Route::apiResource('declarations', DeclarationController::class);
+        Route::get('/my-declarations', [DeclarationController::class, 'getByEmployer'])->name('my-declarations');
+
+        // Employer statistics route
+        Route::get('/my-statistics', [StatisticsController::class, 'getEmployerStatistics'])->name('employer.statistics');
     });
 });

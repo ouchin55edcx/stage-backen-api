@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Employer extends Model
 {
@@ -46,5 +47,13 @@ class Employer extends Model
     public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * Get the declarations for the employer.
+     */
+    public function declarations(): HasMany
+    {
+        return $this->hasMany(Declaration::class);
     }
 }

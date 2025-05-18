@@ -6,6 +6,7 @@ use App\Models\Service;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 class ServiceController extends Controller
@@ -128,11 +129,46 @@ class ServiceController extends Controller
             ], Response::HTTP_NOT_FOUND);
         }
 
-        $service->delete();
+        try {
+            // Use DB transaction to ensure all operations succeed or fail together
+            \Illuminate\Support\Facades\DB::beginTransaction();
 
-        return response()->json([
-            'message' => 'Service deleted successfully'
-        ]);
+            // Get all employers associated with this service
+            $employers = $service->employers;
+
+            // Delete the service forcefully by first removing the relationship
+            if ($employers->count() > 0) {
+                // Find a default service to reassign employers to, or create one if none exists
+                $defaultService = Service::where('id', '!=', $service->id)->first();
+
+                if (!$defaultService) {
+                    // Create a default service if none exists
+                    $defaultService = Service::create(['name' => 'Default Service']);
+                }
+
+                // Reassign all employers to the default service
+                foreach ($employers as $employer) {
+                    $employer->service_id = $defaultService->id;
+                    $employer->save();
+                }
+            }
+
+            // Now delete the service
+            $service->delete();
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json([
+                'message' => 'Service deleted successfully'
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+
+            return response()->json([
+                'message' => 'Failed to delete service',
+                'error' => $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**

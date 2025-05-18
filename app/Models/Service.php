@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Service extends Model
 {
@@ -17,4 +18,12 @@ class Service extends Model
     protected $fillable = [
         'name',
     ];
+
+    /**
+     * Get the employers that belong to the service.
+     */
+    public function employers(): HasMany
+    {
+        return $this->hasMany(Employer::class);
+    }
 }
