@@ -146,6 +146,7 @@ Route::get('/test-my-declarations', [DeclarationController::class, 'getByEmploye
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+    Route::put('/profile', [AuthController::class, 'updateProfile']);
 
     // Admin routes
     Route::middleware('role:Admin')->group(function () {

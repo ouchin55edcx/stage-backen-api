@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Models\Employer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -72,15 +75,105 @@ class AuthController extends Controller
     }
 
     /**
-     * Get the authenticated user.
+     * Get the authenticated user with detailed profile information.
      *
      * @param Request $request
      * @return JsonResponse
      */
     public function user(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $userData = $user->only(['id', 'full_name', 'email', 'role']);
+
+        // Add additional profile information based on user role
+        if ($user->isEmployer()) {
+            $employer = $user->employer()->with('service')->first();
+            if ($employer) {
+                $userData['profile'] = [
+                    'poste' => $employer->poste,
+                    'phone' => $employer->phone,
+                    'service_id' => $employer->service_id,
+                    'service_name' => $employer->service->name ?? null,
+                    'is_active' => $employer->is_active,
+                ];
+            }
+        }
+
         return response()->json([
-            'user' => $request->user()->only(['id', 'full_name', 'email', 'role']),
+            'user' => $userData,
         ]);
+    }
+
+    /**
+     * Update the authenticated user's profile information.
+     *
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Different validation rules based on user role
+        if ($user->isEmployer()) {
+            $validator = Validator::make($request->all(), [
+                'full_name' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
+                'poste' => 'sometimes|required|string|max:255',
+                'phone' => 'sometimes|required|string|max:255',
+            ]);
+        } else {
+            // Admin validation rules
+            $validator = Validator::make($request->all(), [
+                'full_name' => 'sometimes|required|string|max:255',
+                'email' => 'sometimes|required|string|email|max:255|unique:users,email,' . $user->id,
+            ]);
+        }
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Update user basic information
+            if ($request->has('full_name')) {
+                $user->full_name = $request->full_name;
+            }
+            if ($request->has('email')) {
+                $user->email = $request->email;
+            }
+            $user->save();
+
+            // Update employer-specific information if applicable
+            if ($user->isEmployer()) {
+                $employer = $user->employer;
+                if ($employer) {
+                    if ($request->has('poste')) {
+                        $employer->poste = $request->poste;
+                    }
+                    if ($request->has('phone')) {
+                        $employer->phone = $request->phone;
+                    }
+                    $employer->save();
+                }
+            }
+
+            DB::commit();
+
+            // Return updated user data
+            return $this->user($request);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to update profile',
+                'error' => $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }
