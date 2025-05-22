@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 
 class StatisticsController extends Controller
 {
@@ -26,82 +27,104 @@ class StatisticsController extends Controller
         $user = auth()->user();
         $employer = $user->employer;
 
-        // Count declarations by status
-        $declarationStats = [
-            'total' => Declaration::where('employer_id', $employer->id)->count(),
-            'pending' => Declaration::where('employer_id', $employer->id)
-                ->where('status', Declaration::STATUS_PENDING)
-                ->count(),
-            'approved' => Declaration::where('employer_id', $employer->id)
-                ->where('status', Declaration::STATUS_APPROVED)
-                ->count(),
-            'rejected' => Declaration::where('employer_id', $employer->id)
-                ->where('status', Declaration::STATUS_REJECTED)
-                ->count(),
-            'recent' => Declaration::where('employer_id', $employer->id)
-                ->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($declaration) {
-                    return [
-                        'id' => $declaration->id,
-                        'issue_title' => $declaration->issue_title,
-                        'status' => $declaration->status,
-                        'created_at' => $declaration->created_at,
-                    ];
-                }),
-        ];
+        // Cache the statistics for 5 minutes to improve performance
+        // Use a cache key that includes the employer ID to ensure each employer gets their own stats
+        return Cache::remember('employer_statistics_' . $employer->id, 300, function () use ($employer) {
+            // Optimize declaration statistics with fewer queries
+            // Get declaration status counts in a single query for this employer
+            $declarationStatusCounts = Declaration::select('status', DB::raw('count(*) as count'))
+                ->where('employer_id', $employer->id)
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
 
-        // Equipment statistics
-        $equipmentStats = [
-            'total' => Equipment::where('employer_id', $employer->id)->count(),
-            'active' => Equipment::where('employer_id', $employer->id)
-                ->where('status', 'active')
-                ->count(),
-            'on_hold' => Equipment::where('employer_id', $employer->id)
-                ->where('status', 'on_hold')
-                ->count(),
-            'in_progress' => Equipment::where('employer_id', $employer->id)
-                ->where('status', 'in_progress')
-                ->count(),
-            'recent' => Equipment::where('employer_id', $employer->id)
-                ->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($equipment) {
-                    return [
-                        'id' => $equipment->id,
-                        'name' => $equipment->name,
-                        'type' => $equipment->type,
-                        'status' => $equipment->status,
-                    ];
-                }),
-        ];
+            $declarationStats = [
+                'total' => array_sum($declarationStatusCounts),
+                'pending' => $declarationStatusCounts[Declaration::STATUS_PENDING] ?? 0,
+                'approved' => $declarationStatusCounts[Declaration::STATUS_APPROVED] ?? 0,
+                'rejected' => $declarationStatusCounts[Declaration::STATUS_REJECTED] ?? 0,
+                'recent' => Declaration::where('employer_id', $employer->id)
+                    ->select('id', 'issue_title', 'status', 'created_at')
+                    ->orderBy('created_at', 'desc')
+                    ->limit(5)
+                    ->get()
+                    ->map(function ($declaration) {
+                        return [
+                            'id' => $declaration->id,
+                            'issue_title' => $declaration->issue_title,
+                            'status' => $declaration->status,
+                            'created_at' => $declaration->created_at,
+                        ];
+                    }),
+            ];
 
-        // Intervention statistics for employer's equipment
-        $equipmentIds = Equipment::where('employer_id', $employer->id)->pluck('id')->toArray();
-        $interventionStats = [
-            'total' => Intervention::whereIn('equipment_id', $equipmentIds)->count(),
-            'recent' => Intervention::whereIn('equipment_id', $equipmentIds)
-                ->with('equipment')
-                ->orderBy('date', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($intervention) {
-                    return [
-                        'id' => $intervention->id,
-                        'date' => $intervention->date,
-                        'technician_name' => $intervention->technician_name,
-                        'equipment_name' => $intervention->equipment->name,
-                    ];
-                }),
-        ];
+            // Optimize equipment statistics with fewer queries
+            // Get equipment status counts in a single query for this employer
+            $equipmentStatusCounts = Equipment::select('status', DB::raw('count(*) as count'))
+                ->where('employer_id', $employer->id)
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
 
-        return response()->json([
-            'declarations' => $declarationStats,
-            'equipment' => $equipmentStats,
-            'interventions' => $interventionStats,
-        ]);
+            $equipmentStats = [
+                'total' => array_sum($equipmentStatusCounts),
+                'active' => $equipmentStatusCounts['active'] ?? 0,
+                'on_hold' => $equipmentStatusCounts['on_hold'] ?? 0,
+                'in_progress' => $equipmentStatusCounts['in_progress'] ?? 0,
+                'recent' => Equipment::where('employer_id', $employer->id)
+                    ->select('id', 'name', 'type', 'status')
+                    ->orderBy('created_at', 'desc')
+                    ->limit(5)
+                    ->get()
+                    ->map(function ($equipment) {
+                        return [
+                            'id' => $equipment->id,
+                            'name' => $equipment->name,
+                            'type' => $equipment->type,
+                            'status' => $equipment->status,
+                        ];
+                    }),
+            ];
+
+            // Optimize intervention statistics with fewer queries
+            // Get equipment IDs in a single query
+            $equipmentIds = Equipment::where('employer_id', $employer->id)->pluck('id')->toArray();
+
+            // Only proceed with intervention queries if there are equipment IDs
+            if (!empty($equipmentIds)) {
+                $interventionStats = [
+                    'total' => Intervention::whereIn('equipment_id', $equipmentIds)->count(),
+                    'recent' => Intervention::whereIn('equipment_id', $equipmentIds)
+                        ->with(['equipment' => function ($query) {
+                            $query->select('id', 'name');
+                        }])
+                        ->select('id', 'date', 'technician_name', 'equipment_id')
+                        ->orderBy('date', 'desc')
+                        ->limit(5)
+                        ->get()
+                        ->map(function ($intervention) {
+                            return [
+                                'id' => $intervention->id,
+                                'date' => $intervention->date,
+                                'technician_name' => $intervention->technician_name,
+                                'equipment_name' => $intervention->equipment->name,
+                            ];
+                        }),
+                ];
+            } else {
+                // If no equipment, return empty stats
+                $interventionStats = [
+                    'total' => 0,
+                    'recent' => [],
+                ];
+            }
+
+            return response()->json([
+                'declarations' => $declarationStats,
+                'equipment' => $equipmentStats,
+                'interventions' => $interventionStats,
+            ]);
+        });
     }
 
     /**
@@ -111,66 +134,94 @@ class StatisticsController extends Controller
      */
     public function getAdminStatistics(): JsonResponse
     {
-        // Count total users by role
-        $userStats = [
-            'total' => User::count(),
-            'admins' => User::where('role', 'Admin')->count(),
-            'employers' => User::where('role', 'Employer')->count(),
-            'active_employers' => Employer::where('is_active', true)->count(),
-            'inactive_employers' => Employer::where('is_active', false)->count(),
-            'recent_users' => User::orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($user) {
-                    return [
-                        'id' => $user->id,
-                        'full_name' => $user->full_name,
-                        'email' => $user->email,
-                        'role' => $user->role,
-                        'created_at' => $user->created_at,
-                    ];
-                }),
-            'employers_by_service' => DB::table('employers')
-                ->join('services', 'employers.service_id', '=', 'services.id')
-                ->select('services.name', DB::raw('count(*) as count'))
-                ->groupBy('services.name')
-                ->get()
-                ->pluck('count', 'name')
-                ->toArray(),
-        ];
+        // Cache the statistics for 5 minutes to improve performance
+        return Cache::remember('admin_statistics', 300, function () {
+            // Optimize user statistics with a single query for role counts
+            $userRoleCounts = User::select('role', DB::raw('count(*) as count'))
+                ->groupBy('role')
+                ->pluck('count', 'role')
+                ->toArray();
 
-        // Equipment statistics
-        $equipmentStats = [
-            'total' => Equipment::count(),
-            'active' => Equipment::where('status', 'active')->count(),
-            'on_hold' => Equipment::where('status', 'on_hold')->count(),
-            'in_progress' => Equipment::where('status', 'in_progress')->count(),
-            'by_type' => Equipment::select('type', DB::raw('count(*) as count'))
-                ->groupBy('type')
-                ->get()
-                ->pluck('count', 'type')
-                ->toArray(),
-            'by_brand' => Equipment::select('brand', DB::raw('count(*) as count'))
-                ->groupBy('brand')
-                ->get()
-                ->pluck('count', 'brand')
-                ->toArray(),
-            'backup_enabled_count' => Equipment::where('backup_enabled', true)->count(),
-            'backup_disabled_count' => Equipment::where('backup_enabled', false)->count(),
-            'recent' => Equipment::with('employer.user')
-                ->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($equipment) {
-                    return [
-                        'id' => $equipment->id,
-                        'name' => $equipment->name,
-                        'type' => $equipment->type,
-                        'status' => $equipment->status,
-                        'employer_name' => $equipment->employer->user->full_name,
-                    ];
-                }),
-        ];
+            // Get employer active status counts in a single query
+            $employerStatusCounts = Employer::select('is_active', DB::raw('count(*) as count'))
+                ->groupBy('is_active')
+                ->pluck('count', 'is_active')
+                ->toArray();
+
+            $userStats = [
+                'total' => array_sum($userRoleCounts),
+                'admins' => $userRoleCounts['Admin'] ?? 0,
+                'employers' => $userRoleCounts['Employer'] ?? 0,
+                'active_employers' => $employerStatusCounts[1] ?? 0,
+                'inactive_employers' => $employerStatusCounts[0] ?? 0,
+                'recent_users' => User::orderBy('created_at', 'desc')
+                    ->limit(5)
+                    ->get(['id', 'full_name', 'email', 'role', 'created_at'])
+                    ->map(function ($user) {
+                        return [
+                            'id' => $user->id,
+                            'full_name' => $user->full_name,
+                            'email' => $user->email,
+                            'role' => $user->role,
+                            'created_at' => $user->created_at,
+                        ];
+                    }),
+                'employers_by_service' => DB::table('employers')
+                    ->join('services', 'employers.service_id', '=', 'services.id')
+                    ->select('services.name', DB::raw('count(*) as count'))
+                    ->groupBy('services.name')
+                    ->get()
+                    ->pluck('count', 'name')
+                    ->toArray(),
+            ];
+
+            // Optimize equipment statistics with fewer queries
+            // Get equipment status counts in a single query
+            $equipmentStatusCounts = Equipment::select('status', DB::raw('count(*) as count'))
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
+
+            // Get backup enabled counts in a single query
+            $backupEnabledCounts = Equipment::select('backup_enabled', DB::raw('count(*) as count'))
+                ->groupBy('backup_enabled')
+                ->pluck('count', 'backup_enabled')
+                ->toArray();
+
+            $equipmentStats = [
+                'total' => array_sum($equipmentStatusCounts),
+                'active' => $equipmentStatusCounts['active'] ?? 0,
+                'on_hold' => $equipmentStatusCounts['on_hold'] ?? 0,
+                'in_progress' => $equipmentStatusCounts['in_progress'] ?? 0,
+                'by_type' => Equipment::select('type', DB::raw('count(*) as count'))
+                    ->groupBy('type')
+                    ->get()
+                    ->pluck('count', 'type')
+                    ->toArray(),
+                'by_brand' => Equipment::select('brand', DB::raw('count(*) as count'))
+                    ->groupBy('brand')
+                    ->get()
+                    ->pluck('count', 'brand')
+                    ->toArray(),
+                'backup_enabled_count' => $backupEnabledCounts[1] ?? 0,
+                'backup_disabled_count' => $backupEnabledCounts[0] ?? 0,
+                'recent' => Equipment::with(['employer.user' => function ($query) {
+                        $query->select('id', 'full_name', 'employer_id');
+                    }])
+                    ->select('id', 'name', 'type', 'status', 'employer_id', 'created_at')
+                    ->orderBy('created_at', 'desc')
+                    ->limit(5)
+                    ->get()
+                    ->map(function ($equipment) {
+                        return [
+                            'id' => $equipment->id,
+                            'name' => $equipment->name,
+                            'type' => $equipment->type,
+                            'status' => $equipment->status,
+                            'employer_name' => $equipment->employer->user->full_name,
+                        ];
+                    }),
+            ];
 
         // Service statistics
         $serviceStats = [
@@ -190,26 +241,35 @@ class StatisticsController extends Controller
                 }),
         ];
 
-        // Declaration statistics
-        $declarationStats = [
-            'total' => Declaration::count(),
-            'pending' => Declaration::where('status', Declaration::STATUS_PENDING)->count(),
-            'approved' => Declaration::where('status', Declaration::STATUS_APPROVED)->count(),
-            'rejected' => Declaration::where('status', Declaration::STATUS_REJECTED)->count(),
-            'recent' => Declaration::with('employer.user')
-                ->orderBy('created_at', 'desc')
-                ->limit(5)
-                ->get()
-                ->map(function ($declaration) {
-                    return [
-                        'id' => $declaration->id,
-                        'issue_title' => $declaration->issue_title,
-                        'status' => $declaration->status,
-                        'employer_name' => $declaration->employer->user->full_name,
-                        'created_at' => $declaration->created_at,
-                    ];
-                }),
-        ];
+            // Optimize declaration statistics with fewer queries
+            // Get declaration status counts in a single query
+            $declarationStatusCounts = Declaration::select('status', DB::raw('count(*) as count'))
+                ->groupBy('status')
+                ->pluck('count', 'status')
+                ->toArray();
+
+            $declarationStats = [
+                'total' => array_sum($declarationStatusCounts),
+                'pending' => $declarationStatusCounts[Declaration::STATUS_PENDING] ?? 0,
+                'approved' => $declarationStatusCounts[Declaration::STATUS_APPROVED] ?? 0,
+                'rejected' => $declarationStatusCounts[Declaration::STATUS_REJECTED] ?? 0,
+                'recent' => Declaration::with(['employer.user' => function ($query) {
+                        $query->select('id', 'full_name', 'employer_id');
+                    }])
+                    ->select('id', 'issue_title', 'status', 'employer_id', 'created_at')
+                    ->orderBy('created_at', 'desc')
+                    ->limit(5)
+                    ->get()
+                    ->map(function ($declaration) {
+                        return [
+                            'id' => $declaration->id,
+                            'issue_title' => $declaration->issue_title,
+                            'status' => $declaration->status,
+                            'employer_name' => $declaration->employer->user->full_name,
+                            'created_at' => $declaration->created_at,
+                        ];
+                    }),
+            ];
 
         // Intervention statistics
         $interventionStats = [
@@ -226,20 +286,16 @@ class StatisticsController extends Controller
                         'equipment_name' => $intervention->equipment->name,
                     ];
                 }),
-            'by_month' => Intervention::select(
-                DB::raw('MONTH(date) as month'),
-                DB::raw('YEAR(date) as year'),
-                DB::raw('count(*) as count')
-            )
-                ->whereYear('date', date('Y'))
+            'by_month' => Intervention::selectRaw("strftime('%m', date) as month, strftime('%Y', date) as year, count(*) as count")
+                ->whereRaw("strftime('%Y', date) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
                 ->get()
                 ->map(function ($item) {
                     return [
-                        'month' => $item->month,
-                        'year' => $item->year,
+                        'month' => (int)$item->month,
+                        'year' => (int)$item->year,
                         'count' => $item->count,
                     ];
                 }),
@@ -261,67 +317,56 @@ class StatisticsController extends Controller
 
         // Time-based statistics
         $timeStats = [
-            'declarations_by_month' => Declaration::select(
-                DB::raw('MONTH(created_at) as month'),
-                DB::raw('YEAR(created_at) as year'),
-                DB::raw('count(*) as count')
-            )
-                ->whereYear('created_at', date('Y'))
+            'declarations_by_month' => Declaration::selectRaw("strftime('%m', created_at) as month, strftime('%Y', created_at) as year, count(*) as count")
+                ->whereRaw("strftime('%Y', created_at) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
                 ->get()
                 ->map(function ($item) {
                     return [
-                        'month' => $item->month,
-                        'year' => $item->year,
+                        'month' => (int)$item->month,
+                        'year' => (int)$item->year,
                         'count' => $item->count,
                     ];
                 }),
-            'equipment_by_month' => Equipment::select(
-                DB::raw('MONTH(created_at) as month'),
-                DB::raw('YEAR(created_at) as year'),
-                DB::raw('count(*) as count')
-            )
-                ->whereYear('created_at', date('Y'))
+            'equipment_by_month' => Equipment::selectRaw("strftime('%m', created_at) as month, strftime('%Y', created_at) as year, count(*) as count")
+                ->whereRaw("strftime('%Y', created_at) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
                 ->get()
                 ->map(function ($item) {
                     return [
-                        'month' => $item->month,
-                        'year' => $item->year,
+                        'month' => (int)$item->month,
+                        'year' => (int)$item->year,
                         'count' => $item->count,
                     ];
                 }),
-            'users_by_month' => User::select(
-                DB::raw('MONTH(created_at) as month'),
-                DB::raw('YEAR(created_at) as year'),
-                DB::raw('count(*) as count')
-            )
-                ->whereYear('created_at', date('Y'))
+            'users_by_month' => User::selectRaw("strftime('%m', created_at) as month, strftime('%Y', created_at) as year, count(*) as count")
+                ->whereRaw("strftime('%Y', created_at) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
                 ->get()
                 ->map(function ($item) {
                     return [
-                        'month' => $item->month,
-                        'year' => $item->year,
+                        'month' => (int)$item->month,
+                        'year' => (int)$item->year,
                         'count' => $item->count,
                     ];
                 }),
         ];
 
-        return response()->json([
-            'users' => $userStats,
-            'equipment' => $equipmentStats,
-            'services' => $serviceStats,
-            'declarations' => $declarationStats,
-            'interventions' => $interventionStats,
-            'licenses' => $licenseStats,
-            'time_stats' => $timeStats,
-        ]);
+            return response()->json([
+                'users' => $userStats,
+                'equipment' => $equipmentStats,
+                'services' => $serviceStats,
+                'declarations' => $declarationStats,
+                'interventions' => $interventionStats,
+                'licenses' => $licenseStats,
+                'time_stats' => $timeStats,
+            ]);
+        });
     }
 }
