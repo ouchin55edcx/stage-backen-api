@@ -25,4 +25,9 @@ class Intervention extends Model
     {
         return $this->belongsTo(Equipment::class);
     }
+
+    public function maintenances()
+    {
+        return $this->hasMany(Maintenance::class);
+    }
 }

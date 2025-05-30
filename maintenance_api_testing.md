@@ -56,7 +56,6 @@ curl -X GET http://localhost:8080/api/maintenances \
       "performed_date": "2023-08-16",
       "next_maintenance_date": "2023-11-15",
       "observations": "Replaced air filters and updated firmware",
-      "technician_id": 1,
       "created_at": "2023-08-01T10:00:00.000000Z",
       "updated_at": "2023-08-16T15:30:00.000000Z",
       "equipment": {
@@ -64,10 +63,6 @@ curl -X GET http://localhost:8080/api/maintenances \
         "name": "Server X1",
         "type": "Server",
         "status": "active"
-      },
-      "technician": {
-        "id": 1,
-        "full_name": "Admin User"
       }
     }
   ]
@@ -96,7 +91,6 @@ curl -X GET http://localhost:8080/api/maintenances/1 \
     "performed_date": "2023-08-16",
     "next_maintenance_date": "2023-11-15",
     "observations": "Replaced air filters and updated firmware",
-    "technician_id": 1,
     "created_at": "2023-08-01T10:00:00.000000Z",
     "updated_at": "2023-08-16T15:30:00.000000Z",
     "equipment": {
@@ -104,10 +98,6 @@ curl -X GET http://localhost:8080/api/maintenances/1 \
       "name": "Server X1",
       "type": "Server",
       "status": "active"
-    },
-    "technician": {
-      "id": 1,
-      "full_name": "Admin User"
     }
   }
 }

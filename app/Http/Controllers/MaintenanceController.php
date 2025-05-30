@@ -18,13 +18,13 @@ class MaintenanceController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Maintenance::with(['equipment', 'technician']);
-        
-        // Filter by equipment_id if provided
-        if ($request->has('equipment_id')) {
-            $query->where('equipment_id', $request->equipment_id);
+        $query = Maintenance::with(['intervention.equipment']);
+
+        // Filter by intervention_id if provided
+        if ($request->has('intervention_id')) {
+            $query->where('intervention_id', $request->intervention_id);
         }
-        
+
         return response()->json([
             'data' => $query->get()
         ]);
@@ -39,13 +39,12 @@ class MaintenanceController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'equipment_id' => 'required|exists:equipments,id',
+            'intervention_id' => 'required|exists:interventions,id',
             'maintenance_type' => 'required|string|max:255',
             'scheduled_date' => 'required|date',
             'performed_date' => 'nullable|date',
             'next_maintenance_date' => 'nullable|date',
             'observations' => 'nullable|string',
-            'technician_id' => 'nullable|exists:users,id',
         ]);
 
         if ($validator->fails()) {
@@ -59,7 +58,7 @@ class MaintenanceController extends Controller
 
         return response()->json([
             'message' => 'Maintenance created successfully',
-            'data' => $maintenance->load(['equipment', 'technician'])
+            'data' => $maintenance->load(['intervention.equipment'])
         ], Response::HTTP_CREATED);
     }
 
@@ -72,7 +71,7 @@ class MaintenanceController extends Controller
     public function show(Maintenance $maintenance): JsonResponse
     {
         return response()->json([
-            'data' => $maintenance->load(['equipment', 'technician'])
+            'data' => $maintenance->load(['intervention.equipment'])
         ]);
     }
 
@@ -86,13 +85,12 @@ class MaintenanceController extends Controller
     public function update(Request $request, Maintenance $maintenance): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'equipment_id' => 'sometimes|exists:equipments,id',
+            'intervention_id' => 'sometimes|exists:interventions,id',
             'maintenance_type' => 'sometimes|string|max:255',
             'scheduled_date' => 'sometimes|date',
             'performed_date' => 'nullable|date',
             'next_maintenance_date' => 'nullable|date',
             'observations' => 'nullable|string',
-            'technician_id' => 'nullable|exists:users,id',
         ]);
 
         if ($validator->fails()) {
@@ -106,7 +104,7 @@ class MaintenanceController extends Controller
 
         return response()->json([
             'message' => 'Maintenance updated successfully',
-            'data' => $maintenance->fresh()->load(['equipment', 'technician'])
+            'data' => $maintenance->fresh()->load(['intervention.equipment'])
         ]);
     }
 

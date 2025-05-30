@@ -16,13 +16,12 @@ class Maintenance extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'equipment_id',
+        'intervention_id',
         'maintenance_type',
         'scheduled_date',
         'performed_date',
         'next_maintenance_date',
         'observations',
-        'technician_id',
     ];
 
     /**
@@ -37,18 +36,10 @@ class Maintenance extends Model
     ];
 
     /**
-     * Get the equipment that this maintenance is for.
+     * Get the intervention that this maintenance is for.
      */
-    public function equipment(): BelongsTo
+    public function intervention(): BelongsTo
     {
-        return $this->belongsTo(Equipment::class);
-    }
-
-    /**
-     * Get the technician (user) who performed this maintenance.
-     */
-    public function technician(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'technician_id');
+        return $this->belongsTo(Intervention::class);
     }
 }
