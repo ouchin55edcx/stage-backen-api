@@ -34,9 +34,12 @@ class EquipmentController extends Controller
             'brand' => 'required|string|max:255',
             'office_version' => 'required|string|max:255',
             'label' => 'required|string|max:255',
-            'backup_enabled' => 'required|boolean',
+            'backup_enabled' => 'sometimes|boolean',
             'employer_id' => 'required|exists:employers,id'
         ]);
+
+        // Set backup_enabled to false by default if not provided
+        $validatedData['backup_enabled'] = $validatedData['backup_enabled'] ?? false;
 
         $equipment = Equipment::create($validatedData);
 
