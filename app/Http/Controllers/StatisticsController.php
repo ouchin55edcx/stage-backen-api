@@ -206,7 +206,7 @@ class StatisticsController extends Controller
                 'backup_enabled_count' => $backupEnabledCounts[1] ?? 0,
                 'backup_disabled_count' => $backupEnabledCounts[0] ?? 0,
                 'recent' => Equipment::with(['employer.user' => function ($query) {
-                        $query->select('id', 'full_name', 'employer_id');
+                        $query->select('id', 'full_name');
                     }])
                     ->select('id', 'name', 'type', 'status', 'employer_id', 'created_at')
                     ->orderBy('created_at', 'desc')
@@ -254,7 +254,7 @@ class StatisticsController extends Controller
                 'approved' => $declarationStatusCounts[Declaration::STATUS_APPROVED] ?? 0,
                 'rejected' => $declarationStatusCounts[Declaration::STATUS_REJECTED] ?? 0,
                 'recent' => Declaration::with(['employer.user' => function ($query) {
-                        $query->select('id', 'full_name', 'employer_id');
+                        $query->select('id', 'full_name');
                     }])
                     ->select('id', 'issue_title', 'status', 'employer_id', 'created_at')
                     ->orderBy('created_at', 'desc')
@@ -286,8 +286,8 @@ class StatisticsController extends Controller
                         'equipment_name' => $intervention->equipment->name,
                     ];
                 }),
-            'by_month' => Intervention::selectRaw("strftime('%m', date) as month, strftime('%Y', date) as year, count(*) as count")
-                ->whereRaw("strftime('%Y', date) = ?", [date('Y')])
+            'by_month' => Intervention::selectRaw("MONTH(date) as month, YEAR(date) as year, count(*) as count")
+                ->whereRaw("YEAR(date) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
@@ -317,8 +317,8 @@ class StatisticsController extends Controller
 
         // Time-based statistics
         $timeStats = [
-            'declarations_by_month' => Declaration::selectRaw("strftime('%m', created_at) as month, strftime('%Y', created_at) as year, count(*) as count")
-                ->whereRaw("strftime('%Y', created_at) = ?", [date('Y')])
+            'declarations_by_month' => Declaration::selectRaw("MONTH(created_at) as month, YEAR(created_at) as year, count(*) as count")
+                ->whereRaw("YEAR(created_at) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
@@ -330,8 +330,8 @@ class StatisticsController extends Controller
                         'count' => $item->count,
                     ];
                 }),
-            'equipment_by_month' => Equipment::selectRaw("strftime('%m', created_at) as month, strftime('%Y', created_at) as year, count(*) as count")
-                ->whereRaw("strftime('%Y', created_at) = ?", [date('Y')])
+            'equipment_by_month' => Equipment::selectRaw("MONTH(created_at) as month, YEAR(created_at) as year, count(*) as count")
+                ->whereRaw("YEAR(created_at) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
@@ -343,8 +343,8 @@ class StatisticsController extends Controller
                         'count' => $item->count,
                     ];
                 }),
-            'users_by_month' => User::selectRaw("strftime('%m', created_at) as month, strftime('%Y', created_at) as year, count(*) as count")
-                ->whereRaw("strftime('%Y', created_at) = ?", [date('Y')])
+            'users_by_month' => User::selectRaw("MONTH(created_at) as month, YEAR(created_at) as year, count(*) as count")
+                ->whereRaw("YEAR(created_at) = ?", [date('Y')])
                 ->groupBy('year', 'month')
                 ->orderBy('year')
                 ->orderBy('month')
