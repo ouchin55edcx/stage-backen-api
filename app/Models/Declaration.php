@@ -15,6 +15,7 @@ class Declaration extends Model
      */
     const STATUS_PENDING = 'pending';
     const STATUS_APPROVED = 'approved';
+    const STATUS_RESOLVED = 'resolved'; // Alternative to approved
     const STATUS_REJECTED = 'rejected';
 
     /**

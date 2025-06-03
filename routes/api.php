@@ -142,6 +142,8 @@ Route::post('/test-create-employer', function(Illuminate\Http\Request $request) 
 // Test route for debugging
 Route::get('/test-my-declarations', [DeclarationController::class, 'getByEmployer']);
 
+
+
 // Protected routes
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -176,12 +178,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('statistics', [StatisticsController::class, 'getAdminStatistics'])->name('admin.statistics');
     });
 
-    // Employer routes
-    Route::middleware('role:Employer')->group(function () {
-        // Declaration routes for employers
-        Route::apiResource('declarations', DeclarationController::class);
-        Route::get('/my-declarations', [DeclarationController::class, 'getByEmployer'])->name('my-declarations');
+    // Declaration routes accessible by both Employers and Admins
+    Route::apiResource('declarations', DeclarationController::class);
+    Route::get('/my-declarations', [DeclarationController::class, 'getByEmployer'])->name('my-declarations');
 
+    // Employer-only routes
+    Route::middleware('role:Employer')->group(function () {
         // Employer statistics route
         Route::get('/my-statistics', [StatisticsController::class, 'getEmployerStatistics'])->name('employer.statistics');
     });

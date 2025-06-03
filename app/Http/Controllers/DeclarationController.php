@@ -199,23 +199,49 @@ class DeclarationController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $validator = Validator::make($request->all(), [
-            'issue_title' => 'sometimes|required|string|max:255',
-            'description' => 'sometimes|required|string',
-        ]);
+        // Define validation rules based on user role
+        if ($user->isAdmin()) {
+            // Admins can update status and admin_comment, but not content fields
+            $validator = Validator::make($request->all(), [
+                'status' => 'sometimes|required|string|in:' . Declaration::STATUS_PENDING . ',' . Declaration::STATUS_APPROVED . ',' . Declaration::STATUS_RESOLVED . ',' . Declaration::STATUS_REJECTED,
+                'admin_comment' => 'sometimes|nullable|string',
+            ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'errors' => $validator->errors()
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'errors' => $validator->errors()
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            // Update only admin-allowed fields
+            $updateData = $request->only(['status', 'admin_comment']);
+            $declaration->update($updateData);
+
+            $statusText = isset($updateData['status']) ? $updateData['status'] : 'updated';
+            $message = isset($updateData['status']) ? "Declaration status has been updated to {$statusText} successfully" : 'Declaration updated successfully';
+
+        } else {
+            // Employers can only update content fields
+            $validator = Validator::make($request->all(), [
+                'issue_title' => 'sometimes|required|string|max:255',
+                'description' => 'sometimes|required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'errors' => $validator->errors()
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $declaration->update($request->only(['issue_title', 'description']));
+            $message = 'Declaration updated successfully';
         }
-
-        $declaration->update($request->only(['issue_title', 'description']));
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Declaration updated successfully',
+            'message' => $message,
             'data' => $declaration
         ]);
     }
