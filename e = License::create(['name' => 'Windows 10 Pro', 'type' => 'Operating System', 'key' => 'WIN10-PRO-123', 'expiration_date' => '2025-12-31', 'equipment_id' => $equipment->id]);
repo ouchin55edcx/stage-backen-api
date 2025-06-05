@@ -1,0 +1,18 @@
+[90m= [39m[34;4mApp\Models\Equipment[39;24m {#6238
+    [34mid[39m: [35m1[39m,
+    [34mname[39m: "[32mKeane Riddle[39m",
+    [34mtype[39m: "[32mServer[39m",
+    [34mnsc[39m: "[32mHic sint aut ut repu[39m",
+    [34mstatus[39m: "[32mon_hold[39m",
+    [34mip_address[39m: "[32m123.123.1.123[39m",
+    [34mserial_number[39m: "[32m709[39m",
+    [34mprocessor[39m: "[32mExercitation alias e[39m",
+    [34mbrand[39m: "[32mAtque natus distinct[39m",
+    [34moffice_version[39m: "[32mCommodi consectetur[39m",
+    [34mlabel[39m: "[32mFacilis porro quisqu[39m",
+    [34mbackup_enabled[39m: [35m0[39m,
+    [34memployer_id[39m: [35m1[39m,
+    [34mcreated_at[39m: "[32m2025-06-03 20:44:17[39m",
+    [34mupdated_at[39m: "[32m2025-06-03 20:44:17[39m",
+  }
+

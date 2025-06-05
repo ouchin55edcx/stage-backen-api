@@ -12,7 +12,7 @@ class LicenseController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => License::all()
+            'data' => License::with('equipment')->get()
         ]);
     }
 
@@ -22,7 +22,8 @@ class LicenseController extends Controller
             'name' => 'required|string|max:255',
             'type' => 'required|string|max:255',
             'key' => 'required|string|max:255',
-            'expiration_date' => 'required|date'
+            'expiration_date' => 'required|date',
+            'equipment_id' => 'required|exists:equipments,id'
         ]);
 
         if ($validator->fails()) {
@@ -44,7 +45,7 @@ class LicenseController extends Controller
     {
         return response()->json([
             'status' => 'success',
-            'data' => $license
+            'data' => $license->load('equipment')
         ]);
     }
 
@@ -54,7 +55,8 @@ class LicenseController extends Controller
             'name' => 'string|max:255',
             'type' => 'string|max:255',
             'key' => 'string|max:255',
-            'expiration_date' => 'date'
+            'expiration_date' => 'date',
+            'equipment_id' => 'sometimes|exists:equipments,id'
         ]);
 
         if ($validator->fails()) {

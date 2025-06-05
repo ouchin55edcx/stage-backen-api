@@ -17,7 +17,7 @@ class EquipmentController extends Controller
         }
 
         return response()->json([
-            'data' => $query->with('employer')->get()
+            'data' => $query->with(['employer', 'licenses'])->get()
         ]);
     }
 
@@ -45,14 +45,14 @@ class EquipmentController extends Controller
 
         return response()->json([
             'message' => 'Equipment created successfully',
-            'data' => $equipment->load('employer')
+            'data' => $equipment->load(['employer', 'licenses'])
         ], 201);
     }
 
     public function show(Equipment $equipment)
     {
         return response()->json([
-            'data' => $equipment->load('employer')
+            'data' => $equipment->load(['employer', 'licenses'])
         ]);
     }
 
@@ -77,7 +77,7 @@ class EquipmentController extends Controller
 
         return response()->json([
             'message' => 'Equipment updated successfully',
-            'data' => $equipment->load('employer')
+            'data' => $equipment->load(['employer', 'licenses'])
         ]);
     }
 

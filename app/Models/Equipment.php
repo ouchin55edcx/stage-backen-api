@@ -14,6 +14,11 @@ class Equipment extends Model
         return $this->hasMany(Intervention::class);
     }
 
+    public function licenses()
+    {
+        return $this->hasMany(License::class);
+    }
+
     protected $table = 'equipments';
 
     protected $fillable = [
